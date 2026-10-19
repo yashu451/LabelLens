@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { LeafLogo } from '@/components/ui/LeafLogo';
 import { CustomInput } from '@/components/ui/CustomInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SocialButton } from '@/components/ui/SocialButton';
 import { OrganicHeaderDecoration } from '@/components/ui/OrganicHeaderDecoration';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth, mapFirebaseAuthError } from '@/config/firebase';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -27,11 +30,12 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Validation Errors
+  // Validation & Auth Feedback State
   const [fullNameError, setFullNameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = (): boolean => {
@@ -40,6 +44,7 @@ export default function RegisterScreen() {
     setEmailError(null);
     setPasswordError(null);
     setConfirmPasswordError(null);
+    setAuthError(null);
 
     // Full Name check
     if (!fullName.trim()) {
@@ -84,15 +89,45 @@ export default function RegisterScreen() {
     return isValid;
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    setAuthError(null);
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    // Directly navigate to Home Dashboard
-    setTimeout(() => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
+      // Save user's display name to Firebase Auth profile
+      if (fullName.trim()) {
+        try {
+          await updateProfile(userCredential.user, {
+            displayName: fullName.trim(),
+          });
+        } catch {
+          // Non-blocking profile update warning
+        }
+      }
+
       setIsSubmitting(false);
+      // Navigate to existing Home Dashboard upon successful registration
       router.replace('/home');
-    }, 150);
+    } catch (error: any) {
+      setIsSubmitting(false);
+      const errorCode = error?.code || '';
+      if (errorCode === 'auth/email-already-in-use') {
+        setEmailError(mapFirebaseAuthError(errorCode));
+      } else if (errorCode === 'auth/invalid-email') {
+        setEmailError(mapFirebaseAuthError(errorCode));
+      } else if (errorCode === 'auth/weak-password') {
+        setPasswordError(mapFirebaseAuthError(errorCode));
+      } else {
+        setAuthError(mapFirebaseAuthError(errorCode, error?.message));
+      }
+    }
   };
 
   const handleSocialSignIn = (provider: 'google' | 'apple') => {
@@ -126,6 +161,13 @@ export default function RegisterScreen() {
 
           {/* Registration Form Fields */}
           <View style={styles.formContainer}>
+            {authError && (
+              <View style={styles.alertBannerError}>
+                <Feather name="alert-circle" size={16} color="#DC2626" />
+                <Text style={styles.alertBannerTextError}>{authError}</Text>
+              </View>
+            )}
+
             <CustomInput
               iconName="user"
               placeholder="Full name"
@@ -302,5 +344,24 @@ const styles = StyleSheet.create({
   loginHighlight: {
     color: Colors.forestGreen,
     fontWeight: '700',
+  },
+  alertBannerError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  alertBannerTextError: {
+    flex: 1,
+    fontSize: 13,
+    color: '#DC2626',
+    fontWeight: '500',
+    lineHeight: 18,
   },
 });

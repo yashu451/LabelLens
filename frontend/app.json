@@ -33,6 +33,19 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LabelLens to select food label photos from your gallery.",
+          "cameraPermission": "Allow LabelLens to take photos of food labels using your device camera."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow LabelLens to access your camera to scan food labels."
+        }
       ]
     ],
     "experiments": {

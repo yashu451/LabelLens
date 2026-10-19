@@ -9,6 +9,10 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // Splash screen might already be hidden in some environments
 });
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function RootLayout() {
   useEffect(() => {
     // Hide native splash screen once React component mounts
@@ -54,6 +58,14 @@ export default function RootLayout() {
             headerShown: false,
             title: 'Home Dashboard',
             animation: 'fade',
+          }}
+        />
+        <Stack.Screen
+          name="scan"
+          options={{
+            headerShown: false,
+            title: 'Scan Label',
+            animation: 'slide_from_bottom',
           }}
         />
       </Stack>

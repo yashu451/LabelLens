@@ -18,6 +18,8 @@ import { CustomInput } from '@/components/ui/CustomInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SocialButton } from '@/components/ui/SocialButton';
 import { OrganicHeaderDecoration } from '@/components/ui/OrganicHeaderDecoration';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { auth, mapFirebaseAuthError } from '@/config/firebase';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,15 +29,19 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Validation Errors
+  // Validation & Auth Feedback State
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = (): boolean => {
     let isValid = true;
     setEmailError(null);
     setPasswordError(null);
+    setAuthError(null);
+    setSuccessMessage(null);
 
     // Email check
     const trimmedEmail = email.trim();
@@ -62,15 +68,28 @@ export default function LoginScreen() {
     return isValid;
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    setAuthError(null);
+    setSuccessMessage(null);
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    // Directly navigate to Home Dashboard without intermediate modal
-    setTimeout(() => {
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
       setIsSubmitting(false);
+      // Navigate to existing Home Dashboard on successful authentication
       router.replace('/home');
-    }, 150);
+    } catch (error: any) {
+      setIsSubmitting(false);
+      const errorCode = error?.code || '';
+      if (errorCode === 'auth/user-not-found' || errorCode === 'auth/invalid-email') {
+        setEmailError(mapFirebaseAuthError(errorCode));
+      } else if (errorCode === 'auth/wrong-password') {
+        setPasswordError(mapFirebaseAuthError(errorCode));
+      } else {
+        setAuthError(mapFirebaseAuthError(errorCode, error?.message));
+      }
+    }
   };
 
   const handleSocialSignIn = (provider: 'google' | 'apple') => {
@@ -78,8 +97,21 @@ export default function LoginScreen() {
     router.replace('/home');
   };
 
-  const handleForgotPassword = () => {
-    setEmailError('Password recovery service will be active when backend is connected.');
+  const handleForgotPassword = async () => {
+    setAuthError(null);
+    setSuccessMessage(null);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setEmailError('Enter your email to receive password reset instructions');
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setSuccessMessage('Password reset link sent! Check your inbox.');
+    } catch (error: any) {
+      setAuthError(mapFirebaseAuthError(error?.code, error?.message));
+    }
   };
 
   return (
@@ -108,6 +140,20 @@ export default function LoginScreen() {
 
           {/* Form Fields */}
           <View style={styles.formContainer}>
+            {authError && (
+              <View style={styles.alertBannerError}>
+                <Feather name="alert-circle" size={16} color="#DC2626" />
+                <Text style={styles.alertBannerTextError}>{authError}</Text>
+              </View>
+            )}
+
+            {successMessage && (
+              <View style={styles.alertBannerSuccess}>
+                <Feather name="check-circle" size={16} color="#15803D" />
+                <Text style={styles.alertBannerTextSuccess}>{successMessage}</Text>
+              </View>
+            )}
+
             <CustomInput
               iconName="mail"
               placeholder="Email address"
@@ -321,5 +367,43 @@ const styles = StyleSheet.create({
   signUpHighlight: {
     color: Colors.forestGreen,
     fontWeight: '700',
+  },
+  alertBannerError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  alertBannerTextError: {
+    flex: 1,
+    fontSize: 13,
+    color: '#DC2626',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  alertBannerSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  alertBannerTextSuccess: {
+    flex: 1,
+    fontSize: 13,
+    color: '#15803D',
+    fontWeight: '500',
+    lineHeight: 18,
   },
 });
